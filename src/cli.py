@@ -8,9 +8,12 @@ from typing import Tuple
 from maze.generator import generate_maze
 from maze.io import load_maze_json, save_maze_json
 from maze.render import render_ascii, render_png
+
 from solvers.bfs import BFSSolver
 from solvers.dfs import DFSSolver
 from solvers.astar import AStarSolver
+from solvers.mdp_value_iter import ValueIterationSolver
+from solvers.mdp_policy_iter import PolicyIterationSolver
 
 
 Position = Tuple[int, int]
@@ -26,20 +29,30 @@ def _parse_pos(value: str) -> Position:
         raise argparse.ArgumentTypeError("Position must contain two integers") from e
 
 
-def build_solver(algo: str):
+def build_solver(algo: str, gamma: float, theta: float):
     algo = algo.lower().strip()
 
     if algo == "bfs":
         return BFSSolver()
+
     if algo == "dfs":
         return DFSSolver()
+
     if algo == "astar_manhattan":
         return AStarSolver("manhattan")
+
     if algo == "astar_euclidean":
         return AStarSolver("euclidean")
 
+    if algo == "mdp_vi":
+        return ValueIterationSolver(gamma=gamma, theta=theta)
+
+    if algo == "mdp_pi":
+        return PolicyIterationSolver(gamma=gamma, theta=theta)
+
     raise ValueError(
-        "Unknown algorithm. Supported: bfs, dfs, astar_manhattan, astar_euclidean"
+        "Unknown algorithm. Supported: "
+        "bfs, dfs, astar_manhattan, astar_euclidean, mdp_vi, mdp_pi"
     )
 
 
@@ -60,6 +73,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
     )
 
     save_maze_json(str(out_path), maze)
+
     print(f"Saved maze: {out_path}")
     print(f"Type: {args.type} | size: {maze.width}x{maze.height} | seed: {args.seed}")
 
@@ -70,8 +84,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
     if args.png:
         png_path = Path(args.png)
         png_path.parent.mkdir(parents=True, exist_ok=True)
-        title = f"MAZE | {args.type} | {maze.width}x{maze.height} | seed={args.seed}"
-        render_png(maze, path=None, out_path=str(png_path), title=title)
+        render_png(maze, None, str(png_path), title="Generated Maze")
         print(f"Saved PNG: {png_path}")
 
     return 0
@@ -84,7 +97,12 @@ def cmd_solve(args: argparse.Namespace) -> int:
         return 2
 
     maze = load_maze_json(str(maze_path))
-    solver = build_solver(args.algo)
+
+    solver = build_solver(
+        algo=args.algo,
+        gamma=args.gamma,
+        theta=args.theta,
+    )
 
     result = solver.solve(maze)
 
@@ -95,6 +113,10 @@ def cmd_solve(args: argparse.Namespace) -> int:
     print(f"Frontier:  {result.frontier_max}")
     print(f"Path len:  {result.path_length}")
 
+    if result.meta:
+        for k, v in result.meta.items():
+            print(f"{k}: {v}")
+
     if args.ascii:
         print("\n=== Maze (ASCII) ===")
         print(render_ascii(maze, result.path))
@@ -102,9 +124,7 @@ def cmd_solve(args: argparse.Namespace) -> int:
     if args.png:
         out_path = Path(args.png)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-
-        title = f"{result.algorithm.upper()} | success={result.success} | len={result.path_length}"
-        render_png(maze, result.path, str(out_path), title=title)
+        render_png(maze, result.path, str(out_path), title=result.algorithm)
         print(f"\nSaved PNG: {out_path}")
 
     return 0
@@ -118,6 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # Generate
     gen_p = sub.add_parser("generate")
     gen_p.add_argument("--type", required=True, choices=["perfect", "random"])
     gen_p.add_argument("--width", type=int, required=True)
@@ -133,9 +154,12 @@ def build_parser() -> argparse.ArgumentParser:
     gen_p.add_argument("--png", default=None)
     gen_p.set_defaults(func=cmd_generate)
 
+    # Solve
     solve_p = sub.add_parser("solve")
     solve_p.add_argument("--maze", required=True)
     solve_p.add_argument("--algo", required=True)
+    solve_p.add_argument("--gamma", type=float, default=0.95)
+    solve_p.add_argument("--theta", type=float, default=1e-6)
     solve_p.add_argument("--ascii", action="store_true")
     solve_p.add_argument("--png", default=None)
     solve_p.set_defaults(func=cmd_solve)
