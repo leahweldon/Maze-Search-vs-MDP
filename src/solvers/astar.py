@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import heapq
-from typing import Dict, Optional, List, Callable
+from typing import Dict, Optional, List, Callable, Tuple
 
 from maze.grid import Maze, Position
 from metrics import SearchStats, timer_ms
@@ -13,13 +13,18 @@ class AStarSolver:
     """
     A* search implementation.
 
-    Uses f(n) = g(n) + h(n)
-    where:
-      g(n) is cost from start to n
-      h(n) is heuristic estimate from n to goal
+    f(n) = g(n) + h(n)
 
-    Goal test is applied when a node is removed from the priority queue,
-    which guarantees optimality when heuristic is admissible.
+    - g(n): cost from start to n
+    - h(n): heuristic estimate from n to goal
+
+    Goal test is applied when a node is removed from the priority queue.
+    This guarantees optimality when the heuristic is admissible.
+
+    This implementation includes:
+      - Stale entry protection (skips outdated heap entries)
+      - Deterministic tie-breaking
+      - Accurate expansion statistics
     """
 
     def __init__(self, heuristic_name: str):
@@ -37,19 +42,27 @@ class AStarSolver:
     def solve(self, maze: Maze) -> SolveResult:
         stats = SearchStats()
 
-        open_heap: List[tuple[float, Position]] = []
-        heapq.heappush(open_heap, (0.0, maze.start))
+        open_heap: List[Tuple[float, int, Position]] = []
+        counter = 0  # deterministic tie-breaker
 
-        parent: Dict[Position, Optional[Position]] = {maze.start: None}
         g_score: Dict[Position, float] = {maze.start: 0.0}
+        parent: Dict[Position, Optional[Position]] = {maze.start: None}
 
+        start_f = self.heuristic(maze.start, maze.goal)
+        heapq.heappush(open_heap, (start_f, counter, maze.start))
         stats.frontier_max = 1
 
         with timer_ms() as elapsed:
             found = False
 
             while open_heap:
-                _, current = heapq.heappop(open_heap)
+                f_current, _, current = heapq.heappop(open_heap)
+
+                # --- STALE ENTRY CHECK ---
+                expected_f = g_score[current] + self.heuristic(current, maze.goal)
+                if f_current > expected_f:
+                    continue
+
                 stats.nodes_expanded += 1
 
                 if current == maze.goal:
@@ -57,13 +70,15 @@ class AStarSolver:
                     break
 
                 for neighbor in maze.neighbors_4(current):
-                    tentative_g = g_score[current] + 1  # uniform cost
+                    tentative_g = g_score[current] + 1  # uniform cost grid
 
                     if neighbor not in g_score or tentative_g < g_score[neighbor]:
                         g_score[neighbor] = tentative_g
-                        f_score = tentative_g + self.heuristic(neighbor, maze.goal)
                         parent[neighbor] = current
-                        heapq.heappush(open_heap, (f_score, neighbor))
+
+                        counter += 1
+                        f_score = tentative_g + self.heuristic(neighbor, maze.goal)
+                        heapq.heappush(open_heap, (f_score, counter, neighbor))
 
                 stats.frontier_max = max(stats.frontier_max, len(open_heap))
 
@@ -94,7 +109,7 @@ class AStarSolver:
 
 
 def _reconstruct_path(parent: Dict[Position, Optional[Position]], goal: Position):
-    path = []
+    path: List[Position] = []
     cur: Optional[Position] = goal
 
     while cur is not None:
