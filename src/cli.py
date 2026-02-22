@@ -10,6 +10,7 @@ from maze.io import load_maze_json, save_maze_json
 from maze.render import render_ascii, render_png
 from solvers.bfs import BFSSolver
 from solvers.dfs import DFSSolver
+from solvers.astar import AStarSolver
 
 
 Position = Tuple[int, int]
@@ -32,9 +33,13 @@ def build_solver(algo: str):
         return BFSSolver()
     if algo == "dfs":
         return DFSSolver()
+    if algo == "astar_manhattan":
+        return AStarSolver("manhattan")
+    if algo == "astar_euclidean":
+        return AStarSolver("euclidean")
 
     raise ValueError(
-        f"Unknown algorithm '{algo}'. Currently implemented: bfs, dfs."
+        "Unknown algorithm. Supported: bfs, dfs, astar_manhattan, astar_euclidean"
     )
 
 
@@ -113,7 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    gen_p = sub.add_parser("generate", help="Generate a maze and save it to JSON")
+    gen_p = sub.add_parser("generate")
     gen_p.add_argument("--type", required=True, choices=["perfect", "random"])
     gen_p.add_argument("--width", type=int, required=True)
     gen_p.add_argument("--height", type=int, required=True)
@@ -128,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen_p.add_argument("--png", default=None)
     gen_p.set_defaults(func=cmd_generate)
 
-    solve_p = sub.add_parser("solve", help="Solve a maze")
+    solve_p = sub.add_parser("solve")
     solve_p.add_argument("--maze", required=True)
     solve_p.add_argument("--algo", required=True)
     solve_p.add_argument("--ascii", action="store_true")
