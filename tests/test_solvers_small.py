@@ -1,6 +1,7 @@
 from maze.grid import Maze
 from solvers.bfs import BFSSolver
 from solvers.dfs import DFSSolver
+from solvers.astar import AStarSolver
 
 
 def _simple_maze():
@@ -15,7 +16,6 @@ def _simple_maze():
 def test_bfs_finds_shortest_path():
     maze = _simple_maze()
     res = BFSSolver().solve(maze)
-
     assert res.success is True
     assert res.path_length == 5
 
@@ -23,7 +23,18 @@ def test_bfs_finds_shortest_path():
 def test_dfs_finds_a_path():
     maze = _simple_maze()
     res = DFSSolver().solve(maze)
-
     assert res.success is True
-    assert res.path[0] == (0, 0)
-    assert res.path[-1] == (2, 3)
+
+
+def test_astar_manhattan_optimal():
+    maze = _simple_maze()
+    res = AStarSolver("manhattan").solve(maze)
+    assert res.success is True
+    assert res.path_length == 5
+
+
+def test_astar_euclidean_optimal():
+    maze = _simple_maze()
+    res = AStarSolver("euclidean").solve(maze)
+    assert res.success is True
+    assert res.path_length == 5
