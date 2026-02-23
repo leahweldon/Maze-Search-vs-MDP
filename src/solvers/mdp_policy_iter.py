@@ -50,6 +50,7 @@ class PolicyIterationSolver:
                     if delta < self.theta:
                         break
 
+                # Policy improvement
                 stable = True
                 for s in states:
                     if s == maze.goal:
@@ -116,8 +117,12 @@ class PolicyIterationSolver:
                 return path
 
             candidates = []
+            real_move_exists = False
+
             for a in actions:
                 nxt = self._transition(maze, current, a)
+                if nxt != current:
+                    real_move_exists = True
                 reward = self._reward(maze, nxt)
                 q = reward + self.gamma * V[nxt]
                 candidates.append((q, -manhattan(nxt, maze.goal), nxt))
@@ -126,6 +131,8 @@ class PolicyIterationSolver:
 
             moved = False
             for _, _, nxt in candidates:
+                if real_move_exists and nxt == current:
+                    continue
                 if visit_count[nxt] < max_visits_per_state:
                     current = nxt
                     path.append(current)
