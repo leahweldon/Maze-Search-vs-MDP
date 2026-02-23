@@ -14,6 +14,7 @@ from maze.render import (
     render_frontier_animation,
     render_frontier_live,
     render_frontier_live_compare,
+    CompareRenderOptions,
 )
 
 from solvers.bfs import BFSSolver
@@ -215,6 +216,12 @@ def cmd_animate_live_compare(args):
         print("Trace data missing for comparison.")
         return 1
 
+    opts = CompareRenderOptions(
+        delay=args.delay,
+        final_pause_s=args.final_pause,
+        auto_close=not args.keep_open,
+    )
+
     render_frontier_live_compare(
         maze=maze,
         left_title=args.algo1,
@@ -225,11 +232,9 @@ def cmd_animate_live_compare(args):
         right_expanded=e2,
         right_frontier_frames=f2,
         right_frame_indices=i2,
-        delay=args.delay,
         left_path=res1.path,
         right_path=res2.path,
-        final_pause_s=args.final_pause,
-        auto_close=not args.keep_open,
+        options=opts,
     )
     return 0
 
