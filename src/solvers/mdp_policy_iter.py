@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import Dict, Tuple
+from collections import deque
+from typing import Dict, Tuple, List, Optional
 
 from maze.grid import Maze, Position
 from solvers.base import SolveResult
@@ -43,8 +43,8 @@ class PolicyIterationSolver:
                             continue
                         a = policy[s]
                         nxt = self._transition(maze, s, a)
-                        reward = self._reward(maze, nxt)
-                        new_v = reward + self.gamma * V[nxt]
+                        r = self._reward(maze, nxt)
+                        new_v = r + self.gamma * V[nxt]
                         delta = max(delta, abs(new_v - V[s]))
                         V[s] = new_v
                     if delta < self.theta:
@@ -56,26 +56,26 @@ class PolicyIterationSolver:
                     if s == maze.goal:
                         continue
 
-                    old_action = policy[s]
-                    best_action = None
-                    best_value = float("-inf")
+                    old = policy[s]
+                    best_a = None
+                    best_q = float("-inf")
 
                     for a in actions:
                         nxt = self._transition(maze, s, a)
-                        reward = self._reward(maze, nxt)
-                        q = reward + self.gamma * V[nxt]
-                        if q > best_value:
-                            best_value = q
-                            best_action = a
+                        r = self._reward(maze, nxt)
+                        q = r + self.gamma * V[nxt]
+                        if q > best_q:
+                            best_q = q
+                            best_a = a
 
-                    policy[s] = best_action
-                    if best_action != old_action:
+                    policy[s] = best_a
+                    if best_a != old:
                         stable = False
 
                 if stable:
                     break
 
-        path = self._extract_policy_path(maze, V)
+        path = self._extract_path_via_policy_graph(maze, V)
 
         return SolveResult(
             algorithm=self.name,
@@ -99,48 +99,66 @@ class PolicyIterationSolver:
     def _reward(self, maze: Maze, state: Position) -> float:
         return 0.0 if state == maze.goal else -1.0
 
-    def _extract_policy_path(self, maze: Maze, V: Dict[Position, float]) -> list[Position] | None:
+    def _best_successors(self, maze: Maze, V: Dict[Position, float], s: Position) -> List[Position]:
+        if s == maze.goal:
+            return []
+
         actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
-        current = maze.start
-        path = [current]
+        candidates: List[Tuple[float, float, Position]] = []
+        real_move_exists = False
 
-        visit_count = defaultdict(int)
-        visit_count[current] += 1
+        for a in actions:
+            nxt = self._transition(maze, s, a)
+            if nxt != s:
+                real_move_exists = True
+            r = self._reward(maze, nxt)
+            q = r + self.gamma * V[nxt]
+            candidates.append((q, -manhattan(nxt, maze.goal), nxt))
 
-        state_count = len(V)
-        max_steps = max(200, state_count * 20)
-        max_visits_per_state = 10 if self.gamma <= 0.95 else 6
+        if real_move_exists:
+            candidates = [c for c in candidates if c[2] != s]
 
-        for _ in range(max_steps):
-            if current == maze.goal:
-                return path
+        if not candidates:
+            return []
 
-            candidates = []
-            real_move_exists = False
+        candidates.sort(reverse=True)
+        best_q = candidates[0][0]
+        eps = 1e-12
+        best = [nxt for (q, _, nxt) in candidates if abs(q - best_q) <= eps]
 
-            for a in actions:
-                nxt = self._transition(maze, current, a)
-                if nxt != current:
-                    real_move_exists = True
-                reward = self._reward(maze, nxt)
-                q = reward + self.gamma * V[nxt]
-                candidates.append((q, -manhattan(nxt, maze.goal), nxt))
+        seen = set()
+        out = []
+        for nxt in best:
+            if nxt not in seen:
+                out.append(nxt)
+                seen.add(nxt)
+        return out
 
-            candidates.sort(reverse=True)
+    def _extract_path_via_policy_graph(self, maze: Maze, V: Dict[Position, float]) -> Optional[List[Position]]:
+        start = maze.start
+        goal = maze.goal
 
-            moved = False
-            for _, _, nxt in candidates:
-                if real_move_exists and nxt == current:
-                    continue
-                if visit_count[nxt] < max_visits_per_state:
-                    current = nxt
-                    path.append(current)
-                    visit_count[current] += 1
-                    moved = True
-                    break
+        q = deque([start])
+        parent: Dict[Position, Optional[Position]] = {start: None}
 
-            if not moved:
-                return None
+        while q:
+            cur = q.popleft()
+            if cur == goal:
+                break
 
-        return None
+            for nxt in self._best_successors(maze, V, cur):
+                if nxt not in parent:
+                    parent[nxt] = cur
+                    q.append(nxt)
+
+        if goal not in parent:
+            return None
+
+        path: List[Position] = []
+        cur: Optional[Position] = goal
+        while cur is not None:
+            path.append(cur)
+            cur = parent[cur]
+        path.reverse()
+        return path

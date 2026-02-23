@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import Dict, Tuple, List
+from collections import deque
+from typing import Dict, Tuple, List, Optional
 
 from maze.grid import Maze, Position
 from solvers.base import SolveResult
@@ -39,21 +39,21 @@ class ValueIterationSolver:
                     if s == maze.goal:
                         continue
 
-                    best_value = float("-inf")
+                    best = float("-inf")
                     for a in actions:
                         nxt = self._transition(maze, s, a)
-                        reward = self._reward(maze, nxt)
-                        q = reward + self.gamma * V[nxt]
-                        if q > best_value:
-                            best_value = q
+                        r = self._reward(maze, nxt)
+                        q = r + self.gamma * V[nxt]
+                        if q > best:
+                            best = q
 
-                    delta = max(delta, abs(best_value - V[s]))
-                    V[s] = best_value
+                    delta = max(delta, abs(best - V[s]))
+                    V[s] = best
 
                 if delta < self.theta:
                     break
 
-        path = self._extract_policy_path(maze, V)
+        path = self._extract_path_via_policy_graph(maze, V)
 
         return SolveResult(
             algorithm=self.name,
@@ -77,56 +77,81 @@ class ValueIterationSolver:
     def _reward(self, maze: Maze, state: Position) -> float:
         return 0.0 if state == maze.goal else -1.0
 
-    def _extract_policy_path(self, maze: Maze, V: Dict[Position, float]) -> List[Position] | None:
+    def _best_successors(self, maze: Maze, V: Dict[Position, float], s: Position) -> List[Position]:
         """
-        Extract a path using a greedy Q-based policy induced by V.
+        Return the set of best successor states under the greedy (argmax Q) policy.
+        Excludes no-op moves if any real move exists.
+        """
+        if s == maze.goal:
+            return []
 
-        Key robustness tweak:
-          - Do not allow "no-op" actions (where nxt == current) if any real move exists.
-            This prevents getting stuck bouncing in place near walls.
-        """
         actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
-        current = maze.start
-        path = [current]
+        candidates: List[Tuple[float, float, Position]] = []
+        real_move_exists = False
 
-        visit_count = defaultdict(int)
-        visit_count[current] += 1
+        for a in actions:
+            nxt = self._transition(maze, s, a)
+            if nxt != s:
+                real_move_exists = True
+            r = self._reward(maze, nxt)
+            q = r + self.gamma * V[nxt]
+            # tie-break toward goal - bigger is better -> use -manhattan
+            candidates.append((q, -manhattan(nxt, maze.goal), nxt))
 
-        state_count = len(V)
-        max_steps = max(200, state_count * 20)
-        max_visits_per_state = 10 if self.gamma <= 0.95 else 6
+        # Filter no-op if there are real moves
+        if real_move_exists:
+            candidates = [c for c in candidates if c[2] != s]
 
-        for _ in range(max_steps):
-            if current == maze.goal:
-                return path
+        if not candidates:
+            return []
 
-            candidates = []
-            real_move_exists = False
+        candidates.sort(reverse=True)
+        best_q = candidates[0][0]
 
-            for a in actions:
-                nxt = self._transition(maze, current, a)
-                if nxt != current:
-                    real_move_exists = True
-                reward = self._reward(maze, nxt)
-                q = reward + self.gamma * V[nxt]
-                # tie-break toward goal - bigger is better -> use -manhattan
-                candidates.append((q, -manhattan(nxt, maze.goal), nxt))
+        # Collect all successors within a tiny tolerance of best_q (ties)
+        eps = 1e-12
+        best = [nxt for (q, _, nxt) in candidates if abs(q - best_q) <= eps]
 
-            candidates.sort(reverse=True)
+        # Remove duplicates while preserving order
+        seen = set()
+        out = []
+        for nxt in best:
+            if nxt not in seen:
+                out.append(nxt)
+                seen.add(nxt)
+        return out
 
-            moved = False
-            for _, _, nxt in candidates:
-                if real_move_exists and nxt == current:
-                    continue
-                if visit_count[nxt] < max_visits_per_state:
-                    current = nxt
-                    path.append(current)
-                    visit_count[current] += 1
-                    moved = True
-                    break
+    def _extract_path_via_policy_graph(self, maze: Maze, V: Dict[Position, float]) -> Optional[List[Position]]:
+        """
+        Robust extraction:
+        Build a directed graph of greedy-optimal policy edges (ties allowed), then run BFS to goal.
+        """
+        start = maze.start
+        goal = maze.goal
 
-            if not moved:
-                return None
+        # BFS over states using the induced policy edges
+        q = deque([start])
+        parent: Dict[Position, Optional[Position]] = {start: None}
 
-        return None
+        while q:
+            cur = q.popleft()
+            if cur == goal:
+                break
+
+            for nxt in self._best_successors(maze, V, cur):
+                if nxt not in parent:
+                    parent[nxt] = cur
+                    q.append(nxt)
+
+        if goal not in parent:
+            return None
+
+        # Reconstruct
+        path: List[Position] = []
+        cur: Optional[Position] = goal
+        while cur is not None:
+            path.append(cur)
+            cur = parent[cur]
+        path.reverse()
+        return path
