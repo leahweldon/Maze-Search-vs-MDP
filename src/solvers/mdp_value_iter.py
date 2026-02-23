@@ -79,16 +79,11 @@ class ValueIterationSolver:
 
     def _extract_policy_path(self, maze: Maze, V: Dict[Position, float]) -> List[Position] | None:
         """
-        Extract a path by following a greedy Q-based policy induced by V.
+        Extract a path using a greedy Q-based policy induced by V.
 
-        Robustness:
-          - ranks actions by Q(s,a) = r + gamma * V(s')
-          - tie-breaks toward goal (Manhattan)
-          - allows bounded revisits to escape plateaus
-          - hard step cap to guarantee termination
-
-        Note: this does not change the computed value function; it only affects how
-        we extract a representative path from it.
+        Key robustness tweak:
+          - Do not allow "no-op" actions (where nxt == current) if any real move exists.
+            This prevents getting stuck bouncing in place near walls.
         """
         actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
@@ -98,7 +93,6 @@ class ValueIterationSolver:
         visit_count = defaultdict(int)
         visit_count[current] += 1
 
-        # More generous extraction limits for larger mazes / lower gamma
         state_count = len(V)
         max_steps = max(200, state_count * 20)
         max_visits_per_state = 10 if self.gamma <= 0.95 else 6
@@ -108,16 +102,23 @@ class ValueIterationSolver:
                 return path
 
             candidates = []
+            real_move_exists = False
+
             for a in actions:
                 nxt = self._transition(maze, current, a)
+                if nxt != current:
+                    real_move_exists = True
                 reward = self._reward(maze, nxt)
                 q = reward + self.gamma * V[nxt]
+                # tie-break toward goal - bigger is better -> use -manhattan
                 candidates.append((q, -manhattan(nxt, maze.goal), nxt))
 
             candidates.sort(reverse=True)
 
             moved = False
             for _, _, nxt in candidates:
+                if real_move_exists and nxt == current:
+                    continue
                 if visit_count[nxt] < max_visits_per_state:
                     current = nxt
                     path.append(current)
