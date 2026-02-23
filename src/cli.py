@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 from typing import Tuple, List
 
-from experiments.runner import run_experiments
+from experiments.runner import run_experiments, run_experiments_search_only
 from maze.generator import generate_maze
 from maze.io import load_maze_json, save_maze_json
 from maze.render import (
@@ -239,17 +239,128 @@ def cmd_animate_live_compare(args):
     return 0
 
 
+def cmd_animate_compare_gif(args):
+    """
+    Export two separate GIFs (frontier + optional final path) for side-by-side use in the report.
+    This is simpler and more reliable than generating one combined GIF.
+    """
+    maze = load_maze_json(args.maze)
+
+    solver1 = build_tracing_solver(args.algo1, args.stride, args.max_frames)
+    solver2 = build_tracing_solver(args.algo2, args.stride, args.max_frames)
+
+    res1 = solver1.solve(maze)
+    res2 = solver2.solve(maze)
+
+    e1 = res1.meta.get("expanded_order") if res1.meta else None
+    f1 = res1.meta.get("frontier_frames") if res1.meta else None
+    i1 = res1.meta.get("frame_indices") if res1.meta else None
+
+    e2 = res2.meta.get("expanded_order") if res2.meta else None
+    f2 = res2.meta.get("frontier_frames") if res2.meta else None
+    i2 = res2.meta.get("frame_indices") if res2.meta else None
+
+    if not e1 or not f1 or not i1 or not e2 or not f2 or not i2:
+        print("Trace data missing; cannot export GIFs.")
+        return 1
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    gif1 = out_dir / f"{args.algo1}_frontier.gif"
+    gif2 = out_dir / f"{args.algo2}_frontier.gif"
+
+    render_frontier_animation(maze, e1, f1, i1, str(gif1), fps=args.fps)
+    render_frontier_animation(maze, e2, f2, i2, str(gif2), fps=args.fps)
+
+    print(f"Saved frontier GIFs:\n  {gif1}\n  {gif2}")
+
+    if args.export_paths:
+        if res1.success and res1.path:
+            p1 = out_dir / f"{args.algo1}_path.gif"
+            render_path_animation(maze, res1.path, str(p1), fps=args.fps)
+            print(f"Saved path GIF: {p1}")
+
+        if res2.success and res2.path:
+            p2 = out_dir / f"{args.algo2}_path.gif"
+            render_path_animation(maze, res2.path, str(p2), fps=args.fps)
+            print(f"Saved path GIF: {p2}")
+
+    return 0
+
+
+def cmd_export_solutions(args):
+    """
+    Export solution PNGs (and optionally GIFs) for all algorithms on a single maze.
+    This is ideal for report appendices and quick demo assets.
+    """
+    maze = load_maze_json(args.maze)
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    gamma = args.gamma
+    theta = args.theta
+
+    algo_list = [
+        ("bfs", BFSSolver()),
+        ("dfs", DFSSolver()),
+        ("astar_manhattan", AStarSolver("manhattan")),
+        ("astar_euclidean", AStarSolver("euclidean")),
+        ("mdp_vi", ValueIterationSolver(gamma=gamma, theta=theta)),
+        ("mdp_pi", PolicyIterationSolver(gamma=gamma, theta=theta)),
+    ]
+
+    for name, solver in algo_list:
+        res = solver.solve(maze)
+
+        png_path = out_dir / f"{name}.png"
+        render_png(maze, res.path if res.success else None, str(png_path), title=f"{name} | success={res.success}")
+        print(f"Saved PNG: {png_path}")
+
+        if args.export_path_gifs and res.success and res.path:
+            gif_path = out_dir / f"{name}_path.gif"
+            render_path_animation(maze, res.path, str(gif_path), fps=args.fps)
+            print(f"Saved path GIF: {gif_path}")
+
+        if args.export_frontier_gifs and name in {"bfs", "dfs", "astar_manhattan", "astar_euclidean"}:
+            tracer = build_tracing_solver(name, stride=args.stride, max_frames=args.max_frames)
+            t_res = tracer.solve(maze)
+
+            e = t_res.meta.get("expanded_order") if t_res.meta else None
+            f = t_res.meta.get("frontier_frames") if t_res.meta else None
+            i = t_res.meta.get("frame_indices") if t_res.meta else None
+
+            if e and f and i:
+                frontier_gif = out_dir / f"{name}_frontier.gif"
+                render_frontier_animation(maze, e, f, i, str(frontier_gif), fps=args.fps)
+                print(f"Saved frontier GIF: {frontier_gif}")
+
+    return 0
+
+
 def cmd_experiment(args):
     run_experiments(
-    maze_type=args.type,
-    sizes=args.sizes,
-    seeds=args.seeds,
-    gammas=args.gammas,
-    theta=args.theta,
-    output_csv=args.out,
-    mazes_dir=args.mazes_dir,
-    wall_density=args.density,
-)
+        maze_type=args.type,
+        sizes=args.sizes,
+        seeds=args.seeds,
+        gammas=args.gammas,
+        theta=args.theta,
+        output_csv=args.out,
+        mazes_dir=args.mazes_dir,
+        wall_density=args.density,
+    )
+    return 0
+
+def cmd_experiment_search(args):
+    run_experiments_search_only(
+        maze_type=args.type,
+        sizes=args.sizes,
+        seeds=args.seeds,
+        output_csv=args.out,
+        mazes_dir=args.mazes_dir,
+        wall_density=args.density,
+    )
     return 0
 
 # PARSER
@@ -293,8 +404,8 @@ def build_parser():
     af = sub.add_parser("animate_frontier")
     af.add_argument("--maze", required=True)
     af.add_argument("--algo", required=True)
-    af.add_argument("--stride", type=int, default=5)
-    af.add_argument("--max-frames", type=int, default=500)
+    af.add_argument("--stride", type=int, default=10)
+    af.add_argument("--max-frames", type=int, default=400)
     af.add_argument("--fps", type=int, default=12)
     af.add_argument("--out", required=True)
     af.set_defaults(func=cmd_animate_frontier)
@@ -302,8 +413,8 @@ def build_parser():
     al = sub.add_parser("animate_live")
     al.add_argument("--maze", required=True)
     al.add_argument("--algo", required=True)
-    al.add_argument("--stride", type=int, default=5)
-    al.add_argument("--max-frames", type=int, default=500)
+    al.add_argument("--stride", type=int, default=10)
+    al.add_argument("--max-frames", type=int, default=400)
     al.add_argument("--delay", type=float, default=0.05)
     al.set_defaults(func=cmd_animate_live)
 
@@ -311,12 +422,44 @@ def build_parser():
     alc.add_argument("--maze", required=True)
     alc.add_argument("--algo1", required=True)
     alc.add_argument("--algo2", required=True)
-    alc.add_argument("--stride", type=int, default=5)
-    alc.add_argument("--max-frames", type=int, default=500)
-    alc.add_argument("--delay", type=float, default=0.05)
+    alc.add_argument("--stride", type=int, default=10)
+    alc.add_argument("--max-frames", type=int, default=400)
+    alc.add_argument("--delay", type=float, default=0.02)
+    alc.add_argument("--final-pause", type=float, default=2.0)
+    alc.add_argument("--keep-open", action="store_true")
     alc.set_defaults(func=cmd_animate_live_compare)
-    alc.add_argument("--final-pause", type=float, default=2.0, help="Seconds to show final path overlay")
-    alc.add_argument("--keep-open", action="store_true", help="Keep window open after animation finishes")
+
+    cg = sub.add_parser("animate_compare_gif", help="Export two GIFs for side-by-side comparison")
+    cg.add_argument("--maze", required=True)
+    cg.add_argument("--algo1", required=True)
+    cg.add_argument("--algo2", required=True)
+    cg.add_argument("--stride", type=int, default=10)
+    cg.add_argument("--max-frames", type=int, default=400)
+    cg.add_argument("--fps", type=int, default=12)
+    cg.add_argument("--out-dir", required=True)
+    cg.add_argument("--export-paths", action="store_true")
+    cg.set_defaults(func=cmd_animate_compare_gif)
+
+    es = sub.add_parser("export_solutions", help="Export solution PNGs (and optional GIFs) for all algorithms")
+    es.add_argument("--maze", required=True)
+    es.add_argument("--out-dir", required=True)
+    es.add_argument("--gamma", type=float, default=0.95)
+    es.add_argument("--theta", type=float, default=1e-6)
+    es.add_argument("--fps", type=int, default=12)
+    es.add_argument("--export-path-gifs", action="store_true")
+    es.add_argument("--export-frontier-gifs", action="store_true")
+    es.add_argument("--stride", type=int, default=10)
+    es.add_argument("--max-frames", type=int, default=400)
+    es.set_defaults(func=cmd_export_solutions)
+
+    esrch = sub.add_parser("experiment_search", help="Search-only experiment sweep (useful for 100x100)")
+    esrch.add_argument("--type", required=True, choices=["perfect", "random"])
+    esrch.add_argument("--sizes", type=_parse_int_list, required=True)
+    esrch.add_argument("--seeds", type=_parse_int_list, required=True)
+    esrch.add_argument("--mazes-dir", default="results/mazes")
+    esrch.add_argument("--density", type=float, default=0.25)
+    esrch.add_argument("--out", required=True)
+    esrch.set_defaults(func=cmd_experiment_search)
 
     e = sub.add_parser("experiment")
     e.add_argument("--type", required=True, choices=["perfect", "random"])
@@ -325,8 +468,8 @@ def build_parser():
     e.add_argument("--gammas", type=_parse_float_list, required=True)
     e.add_argument("--theta", type=float, default=1e-6)
     e.add_argument("--mazes-dir", default="results/mazes")
+    e.add_argument("--density", type=float, default=0.25)
     e.add_argument("--out", required=True)
-    e.add_argument("--density", type=float, default=0.25, help="Wall density for random mazes")
     e.set_defaults(func=cmd_experiment)
 
     return parser

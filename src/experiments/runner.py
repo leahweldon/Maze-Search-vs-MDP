@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
-
+from typing import List
 import csv
 
 from maze.generator import generate_maze
+from maze.io import save_maze_json
+
 from solvers.bfs import BFSSolver
 from solvers.dfs import DFSSolver
 from solvers.astar import AStarSolver
@@ -24,13 +25,11 @@ def run_experiments(
     wall_density: float = 0.25,
 ):
     """
-    Execute full experiment sweep.
-
-    Adds:
-      - wall_density column for random mazes
+    Full experiment sweep: search + MDP.
     """
-
     Path(mazes_dir).mkdir(parents=True, exist_ok=True)
+    out_path = Path(output_csv)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [
         "maze_id",
@@ -51,13 +50,12 @@ def run_experiments(
         "iterations",
     ]
 
-    with open(output_csv, "w", newline="") as f:
+    with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
         for size in sizes:
             for seed in seeds:
-
                 maze_id = f"{maze_type}_{size}x{size}_seed{seed}"
                 maze_file = f"{mazes_dir}/{maze_id}.json"
 
@@ -66,20 +64,20 @@ def run_experiments(
                     height=size,
                     maze_type=maze_type,
                     seed=seed,
-                    wall_density=wall_density if maze_type == "random" else None,
+                    wall_density=wall_density,
                     ensure_solvable=True,
                 )
+                save_maze_json(maze_file, maze)
 
-                # SEARCH ALGORITHMS
+                # Search algorithms
                 search_algos = [
                     BFSSolver(),
                     DFSSolver(),
                     AStarSolver("manhattan"),
                     AStarSolver("euclidean"),
                 ]
-
                 for solver in search_algos:
-                    result = solver.solve(maze)
+                    res = solver.solve(maze)
                     writer.writerow({
                         "maze_id": maze_id,
                         "maze_file": maze_file,
@@ -88,26 +86,25 @@ def run_experiments(
                         "height": size,
                         "seed": seed,
                         "wall_density": wall_density if maze_type == "random" else "",
-                        "algorithm": result.algorithm,
+                        "algorithm": res.algorithm,
                         "gamma": "",
                         "theta": "",
-                        "runtime_ms": result.runtime_ms,
-                        "nodes_expanded": result.nodes_expanded,
-                        "frontier_max": result.frontier_max,
-                        "path_length": result.path_length,
-                        "success": result.success,
+                        "runtime_ms": res.runtime_ms,
+                        "nodes_expanded": res.nodes_expanded,
+                        "frontier_max": res.frontier_max,
+                        "path_length": res.path_length if res.path_length is not None else "",
+                        "success": res.success,
                         "iterations": "",
                     })
 
-                # MDP ALGORITHMS
+                # MDP algorithms
                 for gamma in gammas:
                     mdp_algos = [
-                        ValueIterationSolver(gamma, theta),
-                        PolicyIterationSolver(gamma, theta),
+                        ValueIterationSolver(gamma=gamma, theta=theta),
+                        PolicyIterationSolver(gamma=gamma, theta=theta),
                     ]
-
                     for solver in mdp_algos:
-                        result = solver.solve(maze)
+                        res = solver.solve(maze)
                         writer.writerow({
                             "maze_id": maze_id,
                             "maze_file": maze_file,
@@ -116,16 +113,102 @@ def run_experiments(
                             "height": size,
                             "seed": seed,
                             "wall_density": wall_density if maze_type == "random" else "",
-                            "algorithm": result.algorithm,
+                            "algorithm": res.algorithm,
                             "gamma": gamma,
                             "theta": theta,
-                            "runtime_ms": result.runtime_ms,
-                            "nodes_expanded": result.nodes_expanded,
-                            "frontier_max": result.frontier_max,
-                            "path_length": result.path_length,
-                            "success": result.success,
-                            "iterations": result.meta.get("iterations") if result.meta else "",
+                            "runtime_ms": res.runtime_ms,
+                            "nodes_expanded": res.nodes_expanded,
+                            "frontier_max": res.frontier_max,
+                            "path_length": res.path_length if res.path_length is not None else "",
+                            "success": res.success,
+                            "iterations": res.meta.get("iterations", "") if res.meta else "",
                         })
 
-    print(f"Experiment results written to: {output_csv}")
+    print(f"Experiment results written to: {out_path}")
+    print(f"Mazes saved to: {mazes_dir}")
+
+
+def run_experiments_search_only(
+    maze_type: str,
+    sizes: List[int],
+    seeds: List[int],
+    output_csv: str,
+    mazes_dir: str,
+    wall_density: float = 0.25,
+):
+    """
+    Search-only experiment sweep (BFS/DFS/A*).
+    Intended for larger sizes such as 100x100 where MDP may be impractical.
+    Writes the SAME CSV schema as run_experiments, leaving MDP fields blank.
+    """
+    Path(mazes_dir).mkdir(parents=True, exist_ok=True)
+    out_path = Path(output_csv)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = [
+        "maze_id",
+        "maze_file",
+        "maze_type",
+        "width",
+        "height",
+        "seed",
+        "wall_density",
+        "algorithm",
+        "gamma",
+        "theta",
+        "runtime_ms",
+        "nodes_expanded",
+        "frontier_max",
+        "path_length",
+        "success",
+        "iterations",
+    ]
+
+    with open(out_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for size in sizes:
+            for seed in seeds:
+                maze_id = f"{maze_type}_{size}x{size}_seed{seed}"
+                maze_file = f"{mazes_dir}/{maze_id}.json"
+
+                maze = generate_maze(
+                    width=size,
+                    height=size,
+                    maze_type=maze_type,
+                    seed=seed,
+                    wall_density=wall_density,
+                    ensure_solvable=True,
+                )
+                save_maze_json(maze_file, maze)
+
+                search_algos = [
+                    BFSSolver(),
+                    DFSSolver(),
+                    AStarSolver("manhattan"),
+                    AStarSolver("euclidean"),
+                ]
+                for solver in search_algos:
+                    res = solver.solve(maze)
+                    writer.writerow({
+                        "maze_id": maze_id,
+                        "maze_file": maze_file,
+                        "maze_type": maze_type,
+                        "width": size,
+                        "height": size,
+                        "seed": seed,
+                        "wall_density": wall_density if maze_type == "random" else "",
+                        "algorithm": res.algorithm,
+                        "gamma": "",
+                        "theta": "",
+                        "runtime_ms": res.runtime_ms,
+                        "nodes_expanded": res.nodes_expanded,
+                        "frontier_max": res.frontier_max,
+                        "path_length": res.path_length if res.path_length is not None else "",
+                        "success": res.success,
+                        "iterations": "",
+                    })
+
+    print(f"Search-only results written to: {out_path}")
     print(f"Mazes saved to: {mazes_dir}")
