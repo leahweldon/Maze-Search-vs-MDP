@@ -65,7 +65,7 @@ def analyze_experiments(input_csv: str, out_dir: str):
             sizes = sorted(sub["size"].unique())
             series = [sub[sub["size"] == s][metric].values for s in sizes]
 
-            ax.boxplot(series, labels=[str(s) for s in sizes])
+            ax.boxplot(series, tick_labels=[str(s) for s in sizes])
             ax.set_title(f"{title} | {algo}")
             ax.set_xlabel("Maze size (N x N)")
             ax.set_ylabel(metric)
