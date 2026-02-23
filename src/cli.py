@@ -241,14 +241,15 @@ def cmd_animate_live_compare(args):
 
 def cmd_experiment(args):
     run_experiments(
-        maze_type=args.type,
-        sizes=args.sizes,
-        seeds=args.seeds,
-        gammas=args.gammas,
-        theta=args.theta,
-        output_csv=args.out,
-        mazes_dir=args.mazes_dir,
-    )
+    maze_type=args.type,
+    sizes=args.sizes,
+    seeds=args.seeds,
+    gammas=args.gammas,
+    theta=args.theta,
+    output_csv=args.out,
+    mazes_dir=args.mazes_dir,
+    wall_density=args.density,
+)
     return 0
 
 # PARSER
@@ -325,6 +326,7 @@ def build_parser():
     e.add_argument("--theta", type=float, default=1e-6)
     e.add_argument("--mazes-dir", default="results/mazes")
     e.add_argument("--out", required=True)
+    e.add_argument("--density", type=float, default=0.25, help="Wall density for random mazes")
     e.set_defaults(func=cmd_experiment)
 
     return parser
