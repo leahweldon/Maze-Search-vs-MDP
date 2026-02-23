@@ -44,6 +44,9 @@ def analyze_experiments(input_csv: str, out_dir: str):
     # Summary table
     group_cols = ["maze_type", "wall_density", "size", "algorithm", "gamma"]
     metrics = ["runtime_ms", "nodes_expanded", "frontier_max", "path_length", "iterations", "efficiency"]
+    if "peak_mem_kb" in df.columns:
+        df["peak_mem_kb"] = pd.to_numeric(df["peak_mem_kb"], errors="coerce")
+        metrics.append("peak_mem_kb")
 
     summary = df.groupby(group_cols)[metrics].agg(["mean", "std"]).reset_index()
     summary_file = out_path / "summary.csv"
@@ -111,6 +114,14 @@ def analyze_experiments(input_csv: str, out_dir: str):
     boxplot_metric(df, "path_length", "Path length distribution", "pathlen_boxplot")
     boxplot_metric(df[df["algorithm"].isin(search_algos)], "frontier_max", "Frontier max (memory proxy)", "frontier_boxplot")
     boxplot_metric(df[df["algorithm"].isin(search_algos)], "efficiency", "Efficiency (path_length / nodes_expanded)", "efficiency_boxplot")
+    # Peak Python allocation (tracemalloc) - only if present
+    if "peak_mem_kb" in df.columns:
+        boxplot_metric(
+            df[df["algorithm"].isin(search_algos)],
+            "peak_mem_kb",
+            "Peak Python allocation (tracemalloc) in KB",
+            "peakmem_boxplot",
+        )
 
     # Scaling plots (mean vs size)
     scaling_plot(df, "runtime_ms", "Scaling: mean runtime vs size", "scaling_runtime.png", include_gamma=False)
@@ -187,6 +198,8 @@ def analyze_experiments(input_csv: str, out_dir: str):
 
     # ---------- Scaling plots (mean vs size) ----------
     scaling_metrics = ["runtime_ms", "nodes_expanded", "frontier_max"]
+    if "peak_mem_kb" in df.columns:
+        scaling_metrics.append("peak_mem_kb")
 
     for metric in scaling_metrics:
         fig, ax = plt.subplots(figsize=(7, 4))
