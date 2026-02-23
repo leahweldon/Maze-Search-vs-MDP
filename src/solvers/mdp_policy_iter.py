@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict, Tuple, List
+from collections import defaultdict
+from typing import Dict, Tuple
 
 from maze.grid import Maze, Position
 from solvers.base import SolveResult
 from metrics import timer_ms
+from heuristics import manhattan
 
 Action = Tuple[int, int]
 
@@ -23,13 +25,10 @@ class PolicyIterationSolver:
             for c in range(maze.width)
             if maze.grid[r][c] == 0
         ]
-
         actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
         V: Dict[Position, float] = {s: 0.0 for s in states}
-        policy: Dict[Position, Action] = {
-            s: actions[0] for s in states if s != maze.goal
-        }
+        policy: Dict[Position, Action] = {s: actions[0] for s in states if s != maze.goal}
 
         with timer_ms() as elapsed:
             iterations = 0
@@ -43,14 +42,12 @@ class PolicyIterationSolver:
                     for s in states:
                         if s == maze.goal:
                             continue
-
                         a = policy[s]
                         nxt = self._transition(maze, s, a)
                         reward = self._reward(maze, nxt)
                         new_v = reward + self.gamma * V[nxt]
                         delta = max(delta, abs(new_v - V[s]))
                         V[s] = new_v
-
                     if delta < self.theta:
                         break
 
@@ -67,10 +64,9 @@ class PolicyIterationSolver:
                     for a in actions:
                         nxt = self._transition(maze, s, a)
                         reward = self._reward(maze, nxt)
-                        value = reward + self.gamma * V[nxt]
-
-                        if value > best_value:
-                            best_value = value
+                        q = reward + self.gamma * V[nxt]
+                        if q > best_value:
+                            best_value = q
                             best_action = a
 
                     policy[s] = best_action
@@ -80,7 +76,7 @@ class PolicyIterationSolver:
                 if stable:
                     break
 
-        path = self._extract_policy_path(maze, policy)
+        path = self._extract_policy_path(maze, V)
 
         return SolveResult(
             algorithm=self.name,
@@ -97,7 +93,6 @@ class PolicyIterationSolver:
         r, c = state
         dr, dc = action
         nxt = (r + dr, c + dc)
-
         if maze.in_bounds(nxt) and maze.is_free(nxt):
             return nxt
         return state
@@ -105,22 +100,41 @@ class PolicyIterationSolver:
     def _reward(self, maze: Maze, state: Position) -> float:
         return 0.0 if state == maze.goal else -1.0
 
-    def _extract_policy_path(self, maze: Maze, policy: Dict[Position, Action]):
+    def _extract_policy_path(self, maze: Maze, V: Dict[Position, float]) -> list[Position] | None:
+        actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
         current = maze.start
         path = [current]
-        visited = {current}
 
-        while current != maze.goal:
-            if current not in policy:
+        visit_count = defaultdict(int)
+        visit_count[current] += 1
+
+        max_steps = len(V) * 6
+        max_visits_per_state = 3
+
+        for _ in range(max_steps):
+            if current == maze.goal:
+                return path
+
+            candidates = []
+            for a in actions:
+                nxt = self._transition(maze, current, a)
+                reward = self._reward(maze, nxt)
+                q = reward + self.gamma * V[nxt]
+                candidates.append((q, -manhattan(nxt, maze.goal), nxt))
+
+            candidates.sort(reverse=True)
+
+            moved = False
+            for _, _, nxt in candidates:
+                if visit_count[nxt] < max_visits_per_state:
+                    current = nxt
+                    path.append(current)
+                    visit_count[current] += 1
+                    moved = True
+                    break
+
+            if not moved:
                 return None
 
-            action = policy[current]
-            current = self._transition(maze, current, action)
-
-            if current in visited:
-                return None
-
-            path.append(current)
-            visited.add(current)
-
-        return path
+        return None
