@@ -32,11 +32,10 @@ class PolicyIterationSolver:
 
         with timer_ms() as elapsed:
             iterations = 0
-
             while True:
                 iterations += 1
 
-                # Policy Evaluation
+                # Policy evaluation
                 while True:
                     delta = 0.0
                     for s in states:
@@ -51,7 +50,6 @@ class PolicyIterationSolver:
                     if delta < self.theta:
                         break
 
-                # Policy Improvement
                 stable = True
                 for s in states:
                     if s == maze.goal:
@@ -109,8 +107,9 @@ class PolicyIterationSolver:
         visit_count = defaultdict(int)
         visit_count[current] += 1
 
-        max_steps = len(V) * 6
-        max_visits_per_state = 3
+        state_count = len(V)
+        max_steps = max(200, state_count * 20)
+        max_visits_per_state = 10 if self.gamma <= 0.95 else 6
 
         for _ in range(max_steps):
             if current == maze.goal:

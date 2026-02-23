@@ -79,24 +79,29 @@ class ValueIterationSolver:
 
     def _extract_policy_path(self, maze: Maze, V: Dict[Position, float]) -> List[Position] | None:
         """
-        Extract a path by following a greedy policy induced by V.
+        Extract a path by following a greedy Q-based policy induced by V.
 
-        Robustness features:
-          - Uses Q(s,a) = r + gamma * V(s') for action ranking
-          - Tie-breaks toward the goal (Manhattan distance)
-          - Allows limited revisits to escape plateaus, but caps total steps and revisit counts
+        Robustness:
+          - ranks actions by Q(s,a) = r + gamma * V(s')
+          - tie-breaks toward goal (Manhattan)
+          - allows bounded revisits to escape plateaus
+          - hard step cap to guarantee termination
+
+        Note: this does not change the computed value function; it only affects how
+        we extract a representative path from it.
         """
         actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
         current = maze.start
         path = [current]
 
-        # Prevent infinite loops while still allowing limited revisits (plateaus are common).
         visit_count = defaultdict(int)
         visit_count[current] += 1
 
-        max_steps = len(V) * 6
-        max_visits_per_state = 3
+        # More generous extraction limits for larger mazes / lower gamma
+        state_count = len(V)
+        max_steps = max(200, state_count * 20)
+        max_visits_per_state = 10 if self.gamma <= 0.95 else 6
 
         for _ in range(max_steps):
             if current == maze.goal:
@@ -107,15 +112,12 @@ class ValueIterationSolver:
                 nxt = self._transition(maze, current, a)
                 reward = self._reward(maze, nxt)
                 q = reward + self.gamma * V[nxt]
-                candidates.append(
-                    (q, -manhattan(nxt, maze.goal), nxt)
-                )
+                candidates.append((q, -manhattan(nxt, maze.goal), nxt))
 
             candidates.sort(reverse=True)
 
             moved = False
             for _, _, nxt in candidates:
-                # Prefer moves that don't exceed revisit budget
                 if visit_count[nxt] < max_visits_per_state:
                     current = nxt
                     path.append(current)
