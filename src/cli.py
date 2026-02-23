@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Tuple, List
 
 from experiments.runner import run_experiments, run_experiments_search_only
+from experiments.yaml_presets import load_presets
 from maze.generator import generate_maze
 from maze.io import load_maze_json, save_maze_json
 from maze.render import (
@@ -360,8 +361,47 @@ def cmd_experiment_search(args):
         output_csv=args.out,
         mazes_dir=args.mazes_dir,
         wall_density=args.density,
+        track_peak_mem=args.track_peak_mem,
     )
     return 0
+
+def cmd_experiment_from_yaml(args):
+    presets = load_presets(args.config)
+    if args.preset not in presets:
+        print(f"Preset not found: {args.preset}")
+        print("Available presets:", ", ".join(sorted(presets.keys())))
+        return 2
+
+    p = presets[args.preset]
+
+    if p.mode == "full":
+        if not p.gammas:
+            raise ValueError("full mode preset must include gammas")
+        run_experiments(
+            maze_type=p.maze_type,
+            sizes=p.sizes,
+            seeds=p.seeds,
+            gammas=p.gammas,
+            theta=p.theta,
+            output_csv=p.out_csv,
+            mazes_dir=p.mazes_dir,
+            wall_density=p.density,
+        )
+        return 0
+
+    if p.mode == "search_only":
+        run_experiments_search_only(
+            maze_type=p.maze_type,
+            sizes=p.sizes,
+            seeds=p.seeds,
+            output_csv=p.out_csv,
+            mazes_dir=p.mazes_dir,
+            wall_density=p.density,
+            track_peak_mem=p.track_peak_mem,
+        )
+        return 0
+
+    raise ValueError(f"Unknown preset mode: {p.mode}")
 
 # PARSER
 def build_parser():
@@ -460,6 +500,7 @@ def build_parser():
     esrch.add_argument("--density", type=float, default=0.25)
     esrch.add_argument("--out", required=True)
     esrch.set_defaults(func=cmd_experiment_search)
+    esrch.add_argument("--track-peak-mem", action="store_true", help="Record peak tracemalloc memory in KB (search-only)")
 
     e = sub.add_parser("experiment")
     e.add_argument("--type", required=True, choices=["perfect", "random"])
@@ -471,6 +512,11 @@ def build_parser():
     e.add_argument("--density", type=float, default=0.25)
     e.add_argument("--out", required=True)
     e.set_defaults(func=cmd_experiment)
+
+    xy = sub.add_parser("experiment_from_yaml", help="Run an experiment preset from a YAML config file")
+    xy.add_argument("--config", default="config/experiments.yaml")
+    xy.add_argument("--preset", required=True, help="Preset name under 'presets:' in YAML")
+    xy.set_defaults(func=cmd_experiment_from_yaml)
 
     return parser
 
