@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 import csv
+import tracemalloc
 
 from maze.generator import generate_maze
 from maze.io import save_maze_json
@@ -135,11 +136,11 @@ def run_experiments_search_only(
     output_csv: str,
     mazes_dir: str,
     wall_density: float = 0.25,
+    track_peak_mem: bool = False,
 ):
     """
     Search-only experiment sweep (BFS/DFS/A*).
-    Intended for larger sizes such as 100x100 where MDP may be impractical.
-    Writes the SAME CSV schema as run_experiments, leaving MDP fields blank.
+    If track_peak_mem=True, records Python allocation peak via tracemalloc as peak_mem_kb.
     """
     Path(mazes_dir).mkdir(parents=True, exist_ok=True)
     out_path = Path(output_csv)
@@ -162,6 +163,7 @@ def run_experiments_search_only(
         "path_length",
         "success",
         "iterations",
+        "peak_mem_kb",
     ]
 
     with open(out_path, "w", newline="") as f:
@@ -189,8 +191,19 @@ def run_experiments_search_only(
                     AStarSolver("manhattan"),
                     AStarSolver("euclidean"),
                 ]
+
                 for solver in search_algos:
-                    res = solver.solve(maze)
+                    peak_kb = ""
+
+                    if track_peak_mem:
+                        tracemalloc.start()
+                        res = solver.solve(maze)
+                        _, peak = tracemalloc.get_traced_memory()
+                        tracemalloc.stop()
+                        peak_kb = peak / 1024.0
+                    else:
+                        res = solver.solve(maze)
+
                     writer.writerow({
                         "maze_id": maze_id,
                         "maze_file": maze_file,
@@ -208,6 +221,7 @@ def run_experiments_search_only(
                         "path_length": res.path_length if res.path_length is not None else "",
                         "success": res.success,
                         "iterations": "",
+                        "peak_mem_kb": peak_kb,
                     })
 
     print(f"Search-only results written to: {out_path}")
