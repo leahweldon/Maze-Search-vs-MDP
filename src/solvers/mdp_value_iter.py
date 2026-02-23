@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Dict, Tuple, List
 
 from maze.grid import Maze, Position
 from solvers.base import SolveResult
 from metrics import timer_ms
+from heuristics import manhattan
 
 Action = Tuple[int, int]
 
@@ -23,14 +25,12 @@ class ValueIterationSolver:
             for c in range(maze.width)
             if maze.grid[r][c] == 0
         ]
-
         actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
         V: Dict[Position, float] = {s: 0.0 for s in states}
 
         with timer_ms() as elapsed:
             iterations = 0
-
             while True:
                 delta = 0.0
                 iterations += 1
@@ -40,12 +40,12 @@ class ValueIterationSolver:
                         continue
 
                     best_value = float("-inf")
-
                     for a in actions:
                         nxt = self._transition(maze, s, a)
                         reward = self._reward(maze, nxt)
-                        value = reward + self.gamma * V[nxt]
-                        best_value = max(best_value, value)
+                        q = reward + self.gamma * V[nxt]
+                        if q > best_value:
+                            best_value = q
 
                     delta = max(delta, abs(best_value - V[s]))
                     V[s] = best_value
@@ -70,7 +70,6 @@ class ValueIterationSolver:
         r, c = state
         dr, dc = action
         nxt = (r + dr, c + dc)
-
         if maze.in_bounds(nxt) and maze.is_free(nxt):
             return nxt
         return state
@@ -78,32 +77,53 @@ class ValueIterationSolver:
     def _reward(self, maze: Maze, state: Position) -> float:
         return 0.0 if state == maze.goal else -1.0
 
-    def _extract_policy_path(self, maze: Maze, V: Dict[Position, float]):
+    def _extract_policy_path(self, maze: Maze, V: Dict[Position, float]) -> List[Position] | None:
+        """
+        Extract a path by following a greedy policy induced by V.
+
+        Robustness features:
+          - Uses Q(s,a) = r + gamma * V(s') for action ranking
+          - Tie-breaks toward the goal (Manhattan distance)
+          - Allows limited revisits to escape plateaus, but caps total steps and revisit counts
+        """
         actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
         current = maze.start
         path = [current]
-        visited = {current}
 
-        while current != maze.goal:
-            best_action = None
-            best_value = float("-inf")
+        # Prevent infinite loops while still allowing limited revisits (plateaus are common).
+        visit_count = defaultdict(int)
+        visit_count[current] += 1
 
+        max_steps = len(V) * 6
+        max_visits_per_state = 3
+
+        for _ in range(max_steps):
+            if current == maze.goal:
+                return path
+
+            candidates = []
             for a in actions:
                 nxt = self._transition(maze, current, a)
-                if V[nxt] > best_value:
-                    best_value = V[nxt]
-                    best_action = a
+                reward = self._reward(maze, nxt)
+                q = reward + self.gamma * V[nxt]
+                candidates.append(
+                    (q, -manhattan(nxt, maze.goal), nxt)
+                )
 
-            if best_action is None:
+            candidates.sort(reverse=True)
+
+            moved = False
+            for _, _, nxt in candidates:
+                # Prefer moves that don't exceed revisit budget
+                if visit_count[nxt] < max_visits_per_state:
+                    current = nxt
+                    path.append(current)
+                    visit_count[current] += 1
+                    moved = True
+                    break
+
+            if not moved:
                 return None
 
-            current = self._transition(maze, current, best_action)
-
-            if current in visited:
-                return None
-
-            path.append(current)
-            visited.add(current)
-
-        return path
+        return None
