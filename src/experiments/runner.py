@@ -24,9 +24,14 @@ def run_experiments(
     output_csv: str,
     mazes_dir: str,
     wall_density: float = 0.25,
+    p_intended: float = 1.0,
 ):
     """
     Full experiment sweep: search + MDP.
+
+    p_intended:
+      - 1.0 => deterministic MDP transitions
+      - <1.0 => stochastic slip model in MDP solvers (intended prob p_intended)
     """
     Path(mazes_dir).mkdir(parents=True, exist_ok=True)
     out_path = Path(output_csv)
@@ -43,6 +48,7 @@ def run_experiments(
         "algorithm",
         "gamma",
         "theta",
+        "p_intended",
         "runtime_ms",
         "nodes_expanded",
         "frontier_max",
@@ -90,6 +96,7 @@ def run_experiments(
                         "algorithm": res.algorithm,
                         "gamma": "",
                         "theta": "",
+                        "p_intended": "",
                         "runtime_ms": res.runtime_ms,
                         "nodes_expanded": res.nodes_expanded,
                         "frontier_max": res.frontier_max,
@@ -101,8 +108,8 @@ def run_experiments(
                 # MDP algorithms
                 for gamma in gammas:
                     mdp_algos = [
-                        ValueIterationSolver(gamma=gamma, theta=theta),
-                        PolicyIterationSolver(gamma=gamma, theta=theta),
+                        ValueIterationSolver(gamma=gamma, theta=theta, p_intended=p_intended),
+                        PolicyIterationSolver(gamma=gamma, theta=theta, p_intended=p_intended),
                     ]
                     for solver in mdp_algos:
                         res = solver.solve(maze)
@@ -117,6 +124,7 @@ def run_experiments(
                             "algorithm": res.algorithm,
                             "gamma": gamma,
                             "theta": theta,
+                            "p_intended": p_intended,
                             "runtime_ms": res.runtime_ms,
                             "nodes_expanded": res.nodes_expanded,
                             "frontier_max": res.frontier_max,
@@ -157,6 +165,7 @@ def run_experiments_search_only(
         "algorithm",
         "gamma",
         "theta",
+        "p_intended",
         "runtime_ms",
         "nodes_expanded",
         "frontier_max",
@@ -215,6 +224,7 @@ def run_experiments_search_only(
                         "algorithm": res.algorithm,
                         "gamma": "",
                         "theta": "",
+                        "p_intended": "",
                         "runtime_ms": res.runtime_ms,
                         "nodes_expanded": res.nodes_expanded,
                         "frontier_max": res.frontier_max,
