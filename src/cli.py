@@ -42,7 +42,7 @@ def _parse_float_list(value: str) -> List[float]:
     return [float(v.strip()) for v in value.split(",") if v.strip()]
 
 
-def build_solver(algo: str, gamma: float, theta: float):
+def build_solver(algo: str, gamma: float, theta: float, p_intended: float):
     algo = algo.lower().strip()
 
     if algo == "bfs":
@@ -54,9 +54,9 @@ def build_solver(algo: str, gamma: float, theta: float):
     if algo == "astar_euclidean":
         return AStarSolver("euclidean")
     if algo == "mdp_vi":
-        return ValueIterationSolver(gamma=gamma, theta=theta)
+        return ValueIterationSolver(gamma=gamma, theta=theta, p_intended=p_intended)
     if algo == "mdp_pi":
-        return PolicyIterationSolver(gamma=gamma, theta=theta)
+        return PolicyIterationSolver(gamma=gamma, theta=theta, p_intended=p_intended)
 
     raise ValueError(
         "Unknown algorithm. Supported: "
@@ -115,7 +115,7 @@ def cmd_generate(args):
 
 def cmd_solve(args):
     maze = load_maze_json(args.maze)
-    solver = build_solver(args.algo, gamma=args.gamma, theta=args.theta)
+    solver = build_solver(args.algo, gamma=args.gamma, theta=args.theta, p_intended=args.p_intended)
     result = solver.solve(maze)
 
     print(f"Algorithm: {result.algorithm}")
@@ -143,7 +143,7 @@ def cmd_solve(args):
 
 def cmd_animate(args):
     maze = load_maze_json(args.maze)
-    solver = build_solver(args.algo, gamma=args.gamma, theta=args.theta)
+    solver = build_solver(args.algo, gamma=args.gamma, theta=args.theta, p_intended=args.p_intended)
     result = solver.solve(maze)
 
     if not result.success or not result.path:
@@ -302,14 +302,15 @@ def cmd_export_solutions(args):
 
     gamma = args.gamma
     theta = args.theta
+    p_intended = args.p_intended
 
     algo_list = [
         ("bfs", BFSSolver()),
         ("dfs", DFSSolver()),
         ("astar_manhattan", AStarSolver("manhattan")),
         ("astar_euclidean", AStarSolver("euclidean")),
-        ("mdp_vi", ValueIterationSolver(gamma=gamma, theta=theta)),
-        ("mdp_pi", PolicyIterationSolver(gamma=gamma, theta=theta)),
+        ("mdp_vi", ValueIterationSolver(gamma=gamma, theta=theta, p_intended=p_intended)),
+        ("mdp_pi", PolicyIterationSolver(gamma=gamma, theta=theta, p_intended=p_intended)),
     ]
 
     for name, solver in algo_list:
@@ -350,6 +351,7 @@ def cmd_experiment(args):
         output_csv=args.out,
         mazes_dir=args.mazes_dir,
         wall_density=args.density,
+        p_intended=args.p_intended,
     )
     return 0
 
@@ -428,6 +430,7 @@ def build_parser():
     s.add_argument("--algo", required=True)
     s.add_argument("--gamma", type=float, default=0.95)
     s.add_argument("--theta", type=float, default=1e-6)
+    s.add_argument("--p-intended", type=float, default=1.0, help="MDP intended-action probability (1.0 = deterministic)")
     s.add_argument("--ascii", action="store_true")
     s.add_argument("--png", default=None)
     s.set_defaults(func=cmd_solve)
@@ -437,6 +440,7 @@ def build_parser():
     a.add_argument("--algo", required=True)
     a.add_argument("--gamma", type=float, default=0.95)
     a.add_argument("--theta", type=float, default=1e-6)
+    a.add_argument("--p-intended", type=float, default=1.0, help="MDP intended-action probability (1.0 = deterministic)")
     a.add_argument("--fps", type=int, default=10)
     a.add_argument("--out", required=True)
     a.set_defaults(func=cmd_animate)
@@ -485,6 +489,7 @@ def build_parser():
     es.add_argument("--out-dir", required=True)
     es.add_argument("--gamma", type=float, default=0.95)
     es.add_argument("--theta", type=float, default=1e-6)
+    es.add_argument("--p-intended", type=float, default=1.0, help="MDP intended-action probability (1.0 = deterministic)")
     es.add_argument("--fps", type=int, default=12)
     es.add_argument("--export-path-gifs", action="store_true")
     es.add_argument("--export-frontier-gifs", action="store_true")
@@ -508,6 +513,7 @@ def build_parser():
     e.add_argument("--seeds", type=_parse_int_list, required=True)
     e.add_argument("--gammas", type=_parse_float_list, required=True)
     e.add_argument("--theta", type=float, default=1e-6)
+    e.add_argument("--p-intended", type=float, default=1.0, help="MDP intended-action probability (1.0 = deterministic)")
     e.add_argument("--mazes-dir", default="results/mazes")
     e.add_argument("--density", type=float, default=0.25)
     e.add_argument("--out", required=True)
