@@ -1,17 +1,23 @@
-# Experiment presets for CS7IS2 Assignment 1
+# CS7IS2 Assignment 1 — Experiment presets
+# Use with:
+#   python -m src.cli experiment_from_yaml --preset <name>
 
 presets:
-  final_perfect:
-    mode: full          # full = search + MDP, search_only = only BFS/DFS/A*
+
+  # Final datasets (full: search + MDP, deterministic)
+
+  final_perfect_FINAL:
+    mode: full
     maze_type: perfect
     sizes: [15, 31, 51]
     seeds: [1, 2, 3, 4, 5]
     gammas: [0.9, 0.95, 0.99]
     theta: 1e-6
+    p_intended: 1.0
     mazes_dir: results/mazes
     out_csv: results/raw/final_perfect_FINAL.csv
 
-  final_random:
+  final_random_FINAL:
     mode: full
     maze_type: random
     sizes: [15, 31, 51]
@@ -19,10 +25,102 @@ presets:
     gammas: [0.9, 0.95, 0.99]
     theta: 1e-6
     density: 0.25
+    p_intended: 1.0
     mazes_dir: results/mazes
     out_csv: results/raw/final_random_FINAL.csv
 
-  density_sweep_d025:
+
+  # Gamma sensitivity (full, deterministic)
+  # Keep p_intended = 1.0 so only gamma changes
+
+  gamma_sensitivity_perfect:
+    mode: full
+    maze_type: perfect
+    sizes: [15, 31]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.9, 0.95, 0.99]
+    theta: 1e-6
+    p_intended: 1.0
+    mazes_dir: results/mazes
+    out_csv: results/raw/gamma_sweep/perfect_gamma_sweep.csv
+
+  gamma_sensitivity_random:
+    mode: full
+    maze_type: random
+    sizes: [15, 31]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.9, 0.95, 0.99]
+    theta: 1e-6
+    density: 0.25
+    p_intended: 1.0
+    mazes_dir: results/mazes
+    out_csv: results/raw/gamma_sweep/random_gamma_sweep.csv
+
+
+  # Stochastic transition sensitivity (full)
+  # Fix gamma = 0.95 and vary p_intended
+
+  stochastic_perfect_p100:
+    mode: full
+    maze_type: perfect
+    sizes: [15, 31]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.95]
+    theta: 1e-6
+    p_intended: 1.0
+    mazes_dir: results/mazes
+    out_csv: results/raw/stochastic_sweep/perfect_p100_gamma095.csv
+
+  stochastic_perfect_p090:
+    mode: full
+    maze_type: perfect
+    sizes: [15, 31]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.95]
+    theta: 1e-6
+    p_intended: 0.9
+    mazes_dir: results/mazes
+    out_csv: results/raw/stochastic_sweep/perfect_p090_gamma095.csv
+
+  stochastic_perfect_p080:
+    mode: full
+    maze_type: perfect
+    sizes: [15, 31]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.95]
+    theta: 1e-6
+    p_intended: 0.8
+    mazes_dir: results/mazes
+    out_csv: results/raw/stochastic_sweep/perfect_p080_gamma095.csv
+
+  stochastic_perfect_p070:
+    mode: full
+    maze_type: perfect
+    sizes: [15, 31]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.95]
+    theta: 1e-6
+    p_intended: 0.7
+    mazes_dir: results/mazes
+    out_csv: results/raw/stochastic_sweep/perfect_p070_gamma095.csv
+
+
+  # Density sweep (full, deterministic)
+  # Fix gamma = 0.95 and vary density
+
+  density_random_d020:
+    mode: full
+    maze_type: random
+    sizes: [31, 51]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.95]
+    theta: 1e-6
+    density: 0.20
+    p_intended: 1.0
+    mazes_dir: results/mazes
+    out_csv: results/raw/density_sweep/random_density_020.csv
+
+  density_random_d025:
     mode: full
     maze_type: random
     sizes: [31, 51]
@@ -30,10 +128,48 @@ presets:
     gammas: [0.95]
     theta: 1e-6
     density: 0.25
+    p_intended: 1.0
     mazes_dir: results/mazes
     out_csv: results/raw/density_sweep/random_density_025.csv
 
-  large_search_100_random:
+  density_random_d030:
+    mode: full
+    maze_type: random
+    sizes: [31, 51]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.95]
+    theta: 1e-6
+    density: 0.30
+    p_intended: 1.0
+    mazes_dir: results/mazes
+    out_csv: results/raw/density_sweep/random_density_030.csv
+
+  density_random_d035:
+    mode: full
+    maze_type: random
+    sizes: [31, 51]
+    seeds: [1, 2, 3, 4, 5]
+    gammas: [0.95]
+    theta: 1e-6
+    density: 0.35
+    p_intended: 1.0
+    mazes_dir: results/mazes
+    out_csv: results/raw/density_sweep/random_density_035.csv
+
+
+  # Large maze search-only presets (100x100)
+  # Optional peak mem via tracemalloc
+
+  large_search_only_perfect_100:
+    mode: search_only
+    maze_type: perfect
+    sizes: [100]
+    seeds: [1, 2, 3]
+    mazes_dir: results/mazes
+    out_csv: results/raw/large_sweep/search_only_perfect_100.csv
+    track_peak_mem: false
+
+  large_search_only_random_100_d025:
     mode: search_only
     maze_type: random
     sizes: [100]
@@ -41,13 +177,23 @@ presets:
     density: 0.25
     mazes_dir: results/mazes
     out_csv: results/raw/large_sweep/search_only_random_100_d025.csv
-    track_peak_mem: true
+    track_peak_mem: false
 
-  large_search_100_perfect:
+  large_search_only_perfect_100_mem:
     mode: search_only
     maze_type: perfect
     sizes: [100]
     seeds: [1, 2, 3]
     mazes_dir: results/mazes
-    out_csv: results/raw/large_sweep/search_only_perfect_100.csv
+    out_csv: results/raw/large_sweep/search_only_perfect_100_mem.csv
+    track_peak_mem: true
+
+  large_search_only_random_100_d025_mem:
+    mode: search_only
+    maze_type: random
+    sizes: [100]
+    seeds: [1, 2, 3]
+    density: 0.25
+    mazes_dir: results/mazes
+    out_csv: results/raw/large_sweep/search_only_random_100_d025_mem.csv
     track_peak_mem: true
