@@ -1,0 +1,4 @@
+maze_type,size,algorithm,gamma,runtime_ms,runtime_ms,nodes_expanded,nodes_expanded,frontier_max,frontier_max,path_length,path_length,iterations,iterations,efficiency,efficiency
+,,,,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std
+random,20,mdp_pi,0.95,51.64544435683638,1.2422122855237248,323.3333333333333,1.5275252316519545,0.0,0.0,38.0,0.0,29.666666666666668,3.0550504633038935,,
+random,20,mdp_vi,0.95,76.62026432808489,53.05869683492484,323.3333333333333,1.5275252316519545,0.0,0.0,38.0,0.0,193.33333333333334,134.5226127211828,,

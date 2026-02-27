@@ -1,0 +1,7 @@
+maze_id,maze_file,maze_type,width,height,seed,wall_density,algorithm,gamma,theta,runtime_ms,nodes_expanded,frontier_max,path_length,success,iterations
+random_100x100_seed1,results/mazes/random_100x100_seed1.json,random,100,100,1,0.25,bfs,,,5.8213339652866125,7373,102,198,True,
+random_100x100_seed1,results/mazes/random_100x100_seed1.json,random,100,100,1,0.25,dfs,,,0.7408329984173179,1117,564,542,True,
+random_100x100_seed1,results/mazes/random_100x100_seed1.json,random,100,100,1,0.25,astar_manhattan,,,3.998999949544668,3229,414,198,True,
+random_100x100_seed1,results/mazes/random_100x100_seed1.json,random,100,100,1,0.25,astar_euclidean,,,8.050290984101593,6543,176,198,True,
+random_100x100_seed1,results/mazes/random_100x100_seed1.json,random,100,100,1,0.25,mdp_vi,0.95,0.0001,1036.3252909155563,7437,0,198,True,181
+random_100x100_seed1,results/mazes/random_100x100_seed1.json,random,100,100,1,0.25,mdp_pi,0.95,0.0001,2195.1661250786856,7437,0,198,True,154

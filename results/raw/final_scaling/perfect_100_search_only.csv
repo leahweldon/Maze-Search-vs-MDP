@@ -1,0 +1,13 @@
+maze_id,maze_file,maze_type,width,height,seed,wall_density,algorithm,gamma,theta,p_intended,runtime_ms,nodes_expanded,frontier_max,path_length,success,iterations,peak_mem_kb
+perfect_100x100_seed1,results/mazes/perfect_100x100_seed1.json,perfect,100,100,1,,bfs,,,,6.121916929259896,2915,9,1424,True,,258.3359375
+perfect_100x100_seed1,results/mazes/perfect_100x100_seed1.json,perfect,100,100,1,,dfs,,,,2.9029579600319266,1449,44,1424,True,,109.40625
+perfect_100x100_seed1,results/mazes/perfect_100x100_seed1.json,perfect,100,100,1,,astar_manhattan,,,,16.679582884535193,2815,8,1424,True,,493.0
+perfect_100x100_seed1,results/mazes/perfect_100x100_seed1.json,perfect,100,100,1,,astar_euclidean,,,,17.434167093597353,2851,9,1424,True,,463.2890625
+perfect_100x100_seed2,results/mazes/perfect_100x100_seed2.json,perfect,100,100,2,,bfs,,,,5.197625025175512,2575,9,1408,True,,118.2890625
+perfect_100x100_seed2,results/mazes/perfect_100x100_seed2.json,perfect,100,100,2,,dfs,,,,2.883874927647412,1493,42,1408,True,,109.234375
+perfect_100x100_seed2,results/mazes/perfect_100x100_seed2.json,perfect,100,100,2,,astar_manhattan,,,,13.091750093735754,2553,9,1408,True,,246.4375
+perfect_100x100_seed2,results/mazes/perfect_100x100_seed2.json,perfect,100,100,2,,astar_euclidean,,,,15.43791696894914,2559,9,1408,True,,247.28125
+perfect_100x100_seed3,results/mazes/perfect_100x100_seed3.json,perfect,100,100,3,,bfs,,,,4.665624932385981,2337,6,1424,True,,110.1796875
+perfect_100x100_seed3,results/mazes/perfect_100x100_seed3.json,perfect,100,100,3,,dfs,,,,3.296291921287775,1717,34,1424,True,,109.1328125
+perfect_100x100_seed3,results/mazes/perfect_100x100_seed3.json,perfect,100,100,3,,astar_manhattan,,,,12.018167064525187,2307,9,1424,True,,226.875
+perfect_100x100_seed3,results/mazes/perfect_100x100_seed3.json,perfect,100,100,3,,astar_euclidean,,,,13.945790939033031,2313,7,1424,True,,227.6484375
