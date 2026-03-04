@@ -66,7 +66,7 @@ class BFSSolver:
                     and (stats.nodes_expanded % self.trace_stride == 0)
                     and frames_recorded < self.trace_max_frames
                 ):
-                    # For BFS, queue order is meaningful, so we snapshot the queue as-is.
+                    # For BFS, queue order is meaningful, so snapshot queue as-is
                     frontier_frames.append(list(q))
                     frame_indices.append(len(expanded_order))
                     frames_recorded += 1
