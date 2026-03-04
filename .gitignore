@@ -210,3 +210,8 @@ __marimo__/
 demo/*.mp4
 demo/*.mov
 demo/*.m4v
+
+# Demo videos (keep local only)
+demo/*.mp4
+demo/*.mov
+demo/*.m4v
