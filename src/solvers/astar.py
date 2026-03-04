@@ -76,7 +76,7 @@ class AStarSolver:
             while open_heap:
                 f_current, _, current = heapq.heappop(open_heap)
 
-                # Stale entry protection: skip if this is not the best-known f for this node
+                # Stale entry protection skip if this is not the best-known f for this node
                 expected_f = g_score[current] + self.heuristic(current, maze.goal)
                 if f_current > expected_f:
                     continue
