@@ -1,387 +1,109 @@
-# CS7IS2 — Assignment 1  
-## Maze Search vs MDP: Implementation and Performance Evaluation
+# Maze Search vs MDP
 
-**Module:** CS7IS2 Artificial Intelligence  
-**Assessment Weight:** 35%  
-**Type:** Individual Assignment  
+Classical search and Markov Decision Process planning, implemented from scratch and benchmarked on procedurally generated mazes up to 100 × 100.
 
----
+[![Tests](https://github.com/leahweldon/Maze-Search-vs-MDP/actions/workflows/tests.yml/badge.svg)](https://github.com/leahweldon/Maze-Search-vs-MDP/actions/workflows/tests.yml) ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776ab) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-# Overview
+![The same 30 × 30 maze solved by BFS, A*, Value Iteration and Policy Iteration](docs/assets/maze-solutions.png)
 
-This project implements and experimentally evaluates:
+*One 30 × 30 maze, four solvers: BFS, A\* (Manhattan), Value Iteration and Policy Iteration all find a shortest path, at very different computational cost.*
 
-## Search Algorithms
-- Depth-First Search (DFS)
-- Breadth-First Search (BFS)
-- A* (Manhattan heuristic)
-- A* (Euclidean heuristic)
+When is it worth modelling a navigation problem as an MDP instead of just searching it? This project implements DFS, BFS, A\* (Manhattan and Euclidean heuristics), Value Iteration and Policy Iteration, then measures how each scales with maze size, structure, discount factor and transition uncertainty. Individual project for CS7IS2 Artificial Intelligence at Trinity College Dublin (2026).
 
-## Markov Decision Process (MDP) Algorithms
-- Value Iteration
-- Policy Iteration
+## Results
 
-All algorithms are applied to mazes of varying sizes and types and compared using multiple performance metrics including:
+**Search: nodes expanded on 50 × 50 random mazes** (wall density 0.25, mean of 5 seeds)
 
-- Runtime (milliseconds)
-- Path length
-- Nodes expanded
-- Frontier maximum size
-- MDP convergence iterations
-- Success rate
-- Peak memory usage (optional via `tracemalloc`)
-- Sensitivity to discount factor (γ)
-- Sensitivity to stochastic transition probability (p_intended)
-- Sensitivity to maze wall density (random mazes)
+| Algorithm | Nodes expanded | Shortest path? |
+|---|---:|:---:|
+| DFS | 789.4 | No |
+| BFS | 1,873.6 | Yes |
+| A\* (Euclidean) | 1,588.4 | Yes |
+| **A\* (Manhattan)** | **986.4** | **Yes** |
 
-This repository contains:
+**MDP: runtime on 50 × 50 perfect mazes** (γ = 0.95, deterministic transitions)
 
-- Full Python implementations of all required algorithms
-- Maze generator (perfect + random)
-- CLI interface for all functionality
-- Automated experiment runner
-- YAML-configurable experiment presets
-- Plot generation tools
-- Raw CSV experimental outputs
-- Demo-ready solution exports (PNG + GIF)
+| Algorithm | Runtime |
+|---|---:|
+| **Value Iteration** | **424.8 ms** |
+| Policy Iteration | 1,076.4 ms |
 
-This implementation satisfies all requirements of the assignment brief and includes additional experimental extensions (stochastic transitions, density sweeps, large-scale runs).
+![Nodes expanded vs maze size, random mazes](report/figures/random_nodes_vs_size.png)
 
----
+## Key findings
 
-# Repository Structure
+1. **The right heuristic halves the work.** Manhattan A\* expands 47% fewer nodes than BFS while still guaranteeing the shortest path. Euclidean A\* is admissible too, but it underestimates distance on a 4-connected grid, so it explores far more.
+2. **Search wins on deterministic navigation.** Search finds one path; an MDP computes an optimal action for *every* cell. That's wasted effort when moves always succeed, and exactly what you need when they don't.
+3. **Uncertainty is expensive.** Adding a 10% chance of slipping sideways made Policy Iteration about 6× slower on 20 × 20 mazes (54 ms → 321 ms), and Value Iteration's iteration count rose from about 107 to over 166 at 70% reliability.
+4. **Value Iteration beats Policy Iteration under deterministic transitions**, running about 2.5× faster at 50 × 50. As γ approaches 1, both slow down as convergence weakens.
 
-```
-CS7IS2-ASSIGNMENT1/
+## How it works
 
-config/
-    experiments.yaml
+| Component | Source | Notes |
+|---|---|---|
+| Maze generation | [`src/maze/`](src/maze/) | Seeded perfect mazes and random mazes with configurable wall density |
+| DFS, BFS | [`src/solvers/dfs.py`](src/solvers/dfs.py), [`bfs.py`](src/solvers/bfs.py) | Stack and queue frontiers with path reconstruction |
+| A\* | [`src/solvers/astar.py`](src/solvers/astar.py) | Priority queue with Manhattan or Euclidean heuristic |
+| Value / Policy Iteration | [`src/solvers/mdp_value_iter.py`](src/solvers/mdp_value_iter.py), [`mdp_policy_iter.py`](src/solvers/mdp_policy_iter.py) | Bellman updates, greedy policy extraction, optional slip model |
+| Experiments | [`src/experiments/`](src/experiments/), [`config/experiments.yaml`](config/experiments.yaml) | YAML presets, multi-seed sweeps, metric aggregation and plotting |
+| CLI | [`src/cli.py`](src/cli.py) | Generate, solve, animate, export solutions and run experiments |
 
-demo/
+**MDP model:** reward −1 per step and 0 at the goal. With `p_intended < 1`, the agent moves as intended with that probability and otherwise slips to one of the two perpendicular directions; moves into walls leave it in place.
 
-report/
-    demo_assets/
-    figures/
+**Metrics recorded:** runtime, nodes expanded, maximum frontier size, path length, MDP iterations, success rate and optional peak memory.
 
-results/
-    mazes/
-    raw/
-    analysis/
-    plots/
-    solutions/
+## Getting started
 
-src/
-    cli.py
-    heuristics.py
-    metrics.py
-    maze/
-    solvers/
-    experiments/
-
-tests/
-
-requirements.txt
-README.md
-readme.txt
-```
-
----
-
-# 1️⃣ Setup
-
-## Create Virtual Environment
+Requires Python 3.12+.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-```
-
-## Install Dependencies
-
-```bash
 pip install -r requirements.txt
+PYTHONPATH=src:. python -m pytest -q tests
 ```
 
-## Run Tests
+Generate a maze and solve it:
 
 ```bash
-pytest -q
+PYTHONPATH=src:. python -m src.cli generate --type random --width 21 --height 21 \
+  --density 0.25 --seed 1 --out maze.json
+
+PYTHONPATH=src:. python -m src.cli solve --maze maze.json --algo astar_manhattan
 ```
 
-Tested with Python 3.11+.
-
----
-
-# 2️⃣ Maze Generator (Assignment Requirement 1)
-
-The maze generator supports:
-
-- Perfect mazes (tree-structured, DFS backtracker)
-- Random mazes with configurable wall density
-- Arbitrary dimensions (e.g. 15×15, 31×31, 51×51, 100×100)
-- Deterministic reproducibility via seed
-- Optional solvability enforcement
-
-No maze sizes are hard-coded.
-
-## Generate Perfect Maze
-
-```bash
-python -m src.cli generate \
-  --type perfect \
-  --width 31 \
-  --height 31 \
-  --seed 1 \
-  --out results/mazes/perfect_31x31_seed1.json
+```text
+Success:   True
+Runtime:   0.439 ms
+Expanded:  170
+Frontier:  32
+Path len:  40
 ```
 
-## Generate Random Maze
+Other algorithms: `dfs`, `bfs`, `astar_euclidean`, `mdp_vi` and `mdp_pi` (with `--gamma`, `--theta` and `--p-intended`). Run `PYTHONPATH=src:. python -m src.cli --help` for animation, solution export and experiment commands; [`readme.txt`](readme.txt) has the full command reference.
 
-```bash
-python -m src.cli generate \
-  --type random \
-  --width 51 \
-  --height 51 \
-  --density 0.25 \
-  --seed 3 \
-  --out results/mazes/random_51x51_seed3.json
+## Repository structure
+
+```text
+├── src/
+│   ├── maze/              # Generation, grid model, I/O, rendering
+│   ├── solvers/           # DFS, BFS, A*, Value Iteration, Policy Iteration
+│   ├── experiments/       # Runners, presets, analysis, figure generation
+│   ├── heuristics.py
+│   ├── metrics.py
+│   └── cli.py
+├── tests/
+├── config/experiments.yaml
+├── results/raw/           # Selected CSVs behind the report's figures
+├── report/figures/        # Report figures
+└── docs/
+    └── Maze-Search-vs-MDP-Report.pdf
 ```
 
----
+## Report
 
-# 3️⃣ Search Algorithms (Assignment Requirement 2)
-
-Implemented in `src/solvers/`.
-
-## DFS
-- Stack-based
-- Explores deeply before backtracking
-- Not guaranteed optimal
-
-## BFS
-- Queue-based
-- Guarantees shortest path in unweighted grids
-
-## A* (Two Heuristics)
-- Manhattan distance
-- Euclidean distance
-
-Both heuristics are admissible and consistent in grid-based mazes.
-
-## Solve a Maze
-
-```bash
-python -m src.cli solve \
-  --maze results/mazes/perfect_31x31_seed1.json \
-  --algo bfs
-```
-
-Supported algorithms:
-
-- bfs  
-- dfs  
-- astar_manhattan  
-- astar_euclidean  
-- mdp_vi  
-- mdp_pi  
-
----
-
-# 4️⃣ MDP Algorithms (Assignment Requirement 3)
-
-Implemented:
-
-- Value Iteration
-- Policy Iteration
-
-Configurable parameters:
-
-- Discount factor γ
-- Convergence threshold θ
-- Intended-action probability (p_intended)
-
-## Deterministic MDP
-
-```bash
-python -m src.cli solve \
-  --maze results/mazes/perfect_31x31_seed1.json \
-  --algo mdp_vi \
-  --gamma 0.95 \
-  --theta 1e-6
-```
-
-## Stochastic MDP Example
-
-```bash
-python -m src.cli solve \
-  --maze results/mazes/perfect_31x31_seed1.json \
-  --algo mdp_vi \
-  --gamma 0.95 \
-  --theta 1e-6 \
-  --p-intended 0.8
-```
-
-Where:
-- `p_intended = 1.0` → deterministic transitions  
-- `p_intended < 1.0` → stochastic transitions  
-
----
-
-# 5️⃣ Experimental Framework (Assignment Requirement 4)
-
-A complete experiment pipeline is provided.
-
-## Metrics Recorded
-
-- runtime_ms
-- path_length
-- nodes_expanded
-- frontier_max
-- success
-- iterations (MDP only)
-- peak_mem_kb (optional)
-
-Results are saved in:
-
-```
-results/raw/
-```
-
----
-
-## Full Experiment (Search + MDP)
-
-```bash
-python -m src.cli experiment \
-  --type perfect \
-  --sizes 15,31,51 \
-  --seeds 1,2,3,4,5 \
-  --gammas 0.9,0.95,0.99 \
-  --theta 1e-6 \
-  --out results/raw/final_perfect.csv
-```
-
----
-
-## YAML-Based Experiment Presets (Recommended)
-
-Predefined experiment configurations are stored in:
-
-```
-config/experiments.yaml
-```
-
-Run a preset:
-
-```bash
-python -m src.cli experiment_from_yaml --preset final_perfect_FINAL
-```
-
-Preset categories include:
-
-- Final evaluation datasets
-- Gamma sensitivity sweeps
-- Stochastic transition sweeps
-- Density sweeps (random mazes)
-- Large-scale search-only experiments (100×100)
-
----
-
-## Large Maze Search-Only Sweep (e.g. 100×100)
-
-```bash
-python -m src.cli experiment_search \
-  --type perfect \
-  --sizes 100 \
-  --seeds 1,2,3 \
-  --track-peak-mem \
-  --out results/raw/search_only_100.csv
-```
-
----
-
-# 6️⃣ Analysis & Plot Generation
-
-After running experiments:
-
-```bash
-python src/experiments/analyze.py \
-  --in results/raw/final_perfect.csv \
-  --out-dir results/analysis/final_perfect
-```
-
-Automatically generated plots include:
-
-- Runtime vs Maze Size
-- Nodes Expanded vs Maze Size
-- Frontier Size vs Maze Size
-- Path Length vs Maze Size
-- MDP Runtime vs Gamma
-- MDP Iterations vs Gamma
-- Success Rate plots
-- Search vs MDP comparison plots
-- Scaling efficiency plots
-- Boxplots for runtime, path length, nodes expanded, frontier size
-
-Outputs are saved in:
-
-```
-results/analysis/<experiment_name>/
-```
-
-A summary CSV is generated alongside the plots.
-
----
-
-# 7️⃣ Demo Export (Assignment Requirement 5)
-
-To export PNG and GIF files for demo recording:
-
-```bash
-python -m src.cli export_solutions \
-  --maze results/mazes/perfect_31x31_seed1.json \
-  --out-dir results/solutions/perfect_31x31_seed1 \
-  --gamma 0.95 \
-  --theta 1e-6 \
-  --export-path-gifs \
-  --export-frontier-gifs
-```
-
-This generates:
-
-- PNG solution images
-- Path animation GIFs
-- Frontier expansion GIFs
-
----
-
-# 8️⃣ Testing
-
-Unit tests are included.
-
-Run:
-
-```bash
-pytest -q
-```
-
----
-
-# 9️⃣ Submission Contents
-
-The final submission zip file includes:
-
-- Python source code
-- Raw CSV experimental outputs
-- Generated plots
-- PDF performance analysis report
-- Demo video (≤ 5 minutes)
-- readme.txt (command reference)
-- Algorithm implementations appended to report (as required by brief)
-
----
+The full 38-page report covers the algorithm design, experimental setup, results for every configuration, discussion and code appendices: **[Maze-Search-vs-MDP-Report.pdf](docs/Maze-Search-vs-MDP-Report.pdf)**
 
 ## License
 
-This project is licensed under the MIT License.
-See the LICENSE file for details.
+[MIT](LICENSE) © Leah Weldon

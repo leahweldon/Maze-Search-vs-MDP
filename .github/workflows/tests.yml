@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: PYTHONPATH=src:. python -m pytest -q tests
+
+      - name: Smoke test the CLI
+        run: |
+          PYTHONPATH=src:. python -m src.cli generate --type random --width 21 --height 21 --density 0.25 --seed 1 --out /tmp/maze.json
+          PYTHONPATH=src:. python -m src.cli solve --maze /tmp/maze.json --algo astar_manhattan
