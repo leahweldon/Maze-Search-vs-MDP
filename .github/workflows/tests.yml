@@ -28,3 +28,12 @@ jobs:
         run: |
           PYTHONPATH=src:. python -m src.cli generate --type random --width 21 --height 21 --density 0.25 --seed 1 --out /tmp/maze.json
           PYTHONPATH=src:. python -m src.cli solve --maze /tmp/maze.json --algo astar_manhattan
+
+      - name: Redraw README animations
+        run: PYTHONPATH=src:. python scripts/readme_animations.py
+
+      - name: Upload animations
+        uses: actions/upload-artifact@v4
+        with:
+          name: readme-animations
+          path: docs/assets/*.gif
