@@ -4,9 +4,9 @@ Classical search and Markov Decision Process planning, implemented from scratch 
 
 [![Tests](https://github.com/leahweldon/Maze-Search-vs-MDP/actions/workflows/tests.yml/badge.svg)](https://github.com/leahweldon/Maze-Search-vs-MDP/actions/workflows/tests.yml) ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776ab) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-![The same 30 × 30 maze solved by BFS, A*, Value Iteration and Policy Iteration](docs/assets/maze-solutions.png)
+![DFS, BFS, A* Euclidean and A* Manhattan exploring the same 41 × 41 maze](docs/assets/search-race.gif)
 
-*One 30 × 30 maze, four solvers: BFS, A\* (Manhattan), Value Iteration and Policy Iteration all find a shortest path, at very different computational cost.*
+*The same 41 × 41 maze, explored one node at a time. A\* with the Manhattan heuristic finds the shortest path after expanding 353 cells; BFS needs 1,215 for the same path, and DFS finds a path almost twice as long.*
 
 When is it worth modelling a navigation problem as an MDP instead of just searching it? This project implements DFS, BFS, A\* (Manhattan and Euclidean heuristics), Value Iteration and Policy Iteration, then measures how each scales with maze size, structure, discount factor and transition uncertainty. Individual project for CS7IS2 Artificial Intelligence at Trinity College Dublin (2026).
 
@@ -30,12 +30,26 @@ When is it worth modelling a navigation problem as an MDP instead of just search
 
 ![Nodes expanded vs maze size, random mazes](report/figures/random_nodes_vs_size.png)
 
+### Value Iteration in motion
+
+<p align="center">
+  <img src="docs/assets/value-iteration.gif" alt="Value Iteration settling a 31 × 31 perfect maze sweep by sweep" width="560">
+</p>
+
+*Each sweep applies the Bellman update to every open cell. Cells are coloured once their value has settled, from gold near the goal to blue far away. After 271 sweeps every cell knows its best move, and following the greedy policy from the start traces the 288-step solution.*
+
 ## Key findings
 
 1. **The right heuristic halves the work.** Manhattan A\* expands 47% fewer nodes than BFS while still guaranteeing the shortest path. Euclidean A\* is admissible too, but it underestimates distance on a 4-connected grid, so it explores far more.
 2. **Search wins on deterministic navigation.** Search finds one path; an MDP computes an optimal action for *every* cell. That's wasted effort when moves always succeed, and exactly what you need when they don't.
 3. **Uncertainty is expensive.** Adding a 10% chance of slipping sideways made Policy Iteration about 6× slower on 20 × 20 mazes (54 ms → 321 ms), and Value Iteration's iteration count rose from about 107 to over 166 at 70% reliability.
 4. **Value Iteration beats Policy Iteration under deterministic transitions**, running about 2.5× faster at 50 × 50. As γ approaches 1, both slow down as convergence weakens.
+
+## Same maze, four solvers
+
+![The same 30 × 30 maze solved by BFS, A*, Value Iteration and Policy Iteration](docs/assets/maze-solutions.png)
+
+*BFS, A\* (Manhattan), Value Iteration and Policy Iteration all find a shortest path through this 30 × 30 maze, at very different computational cost.*
 
 ## How it works
 
@@ -47,6 +61,7 @@ When is it worth modelling a navigation problem as an MDP instead of just search
 | Value / Policy Iteration | [`src/solvers/mdp_value_iter.py`](src/solvers/mdp_value_iter.py), [`mdp_policy_iter.py`](src/solvers/mdp_policy_iter.py) | Bellman updates, greedy policy extraction, optional slip model |
 | Experiments | [`src/experiments/`](src/experiments/), [`config/experiments.yaml`](config/experiments.yaml) | YAML presets, multi-seed sweeps, metric aggregation and plotting |
 | CLI | [`src/cli.py`](src/cli.py) | Generate, solve, animate, export solutions and run experiments |
+| README animations | [`scripts/readme_animations.py`](scripts/readme_animations.py) | Redraws both GIFs above from the solvers' own traces and Bellman updates |
 
 **MDP model:** reward −1 per step and 0 at the goal. With `p_intended < 1`, the agent moves as intended with that probability and otherwise slips to one of the two perpendicular directions; moves into walls leave it in place.
 
@@ -92,6 +107,7 @@ Other algorithms: `dfs`, `bfs`, `astar_euclidean`, `mdp_vi` and `mdp_pi` (with `
 │   ├── heuristics.py
 │   ├── metrics.py
 │   └── cli.py
+├── scripts/               # README animations
 ├── tests/
 ├── config/experiments.yaml
 ├── results/raw/           # Selected CSVs behind the report's figures
